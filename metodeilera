@@ -1,0 +1,124 @@
+import numpy as np
+from math import *
+import matplotlib.pyplot as plt
+
+
+grad = pi / 180 
+g = 9.81         
+ro = 1.240      
+a = 340          
+
+x_0 = 0
+y_0 = 0
+V_0 = 100        
+theta_0 = 30     
+mass = 30    
+S_m = pi * 0.1**2 / 4 
+
+
+def C_x(M):
+    return 0.44
+
+
+def thrust(t):
+    if t <= 2:
+        return 100  
+    else:
+        return 0   
+
+
+Y_0 = np.array([
+    x_0,
+    y_0,
+    V_0 * cos(theta_0 * grad),
+    V_0 * sin(theta_0 * grad)
+])
+
+# Система ОДУ
+def f(t, Y):
+    x, y, V_x, V_y = Y
+    V = sqrt(V_x**2 + V_y**2)
+    M = V / a  
+    
+
+    F_drag = 0.5 * ro * V**2 * S_m * C_x(M)
+    F_drag_x = -F_drag * V_x / V
+    F_drag_y = -F_drag * V_y / V
+    
+    P = thrust(t)
+    P_x = P * cos(theta_0 * grad) 
+    P_y = P * sin(theta_0 * grad)
+    
+
+    a_x = (P_x + F_drag_x) / mass
+    a_y = (P_y + F_drag_y) / mass - g
+    
+    return [V_x, V_y, a_x, a_y]
+
+
+def euler_with_landing(t_0, t_1, y_0, dYdt, n_points):
+    h = (t_1 - t_0) / (n_points - 1)
+    t_points = [t_0]
+    y_points = [y_0.copy()]
+    
+    current_t = t_0
+    current_y = y_0.copy()
+    
+    for i in range(1, n_points):
+        current_t = t_0 + i * h
+        
+
+        derivative = np.array(dYdt(current_t, current_y))
+        new_y = current_y + h * derivative
+        
+    
+        if new_y[1] < 0: 
+            
+            t_fall = current_t - h + h * (current_y[1] / (current_y[1] - new_y[1]))
+            y_fall = current_y + (t_fall - (current_t - h)) * derivative
+            t_points.append(t_fall)
+            y_points.append(y_fall)
+            break
+        else:
+            t_points.append(current_t)
+            y_points.append(new_y)
+            current_y = new_y
+    
+    return np.array(t_points), np.array(y_points)
+
+
+t0 = 0
+t1 = 13
+n_points = 10000
+
+
+t, y = euler_with_landing(t0, t1, Y_0, f, n_points)
+
+
+valid_indices = y[:, 1] >= 0
+x_valid = y[valid_indices, 0]
+y_valid = y[valid_indices, 1]
+
+
+plt.figure(figsize=(10, 6))
+plt.plot(x_valid, y_valid, 'b-', linewidth=2, label='Траектория движения')
+
+plt.plot(x_valid[0], y_valid[0], 'go', markersize=8, label='Начальная точка')
+plt.plot(x_valid[-1], y_valid[-1], 'ro', markersize=8, label='Точка падения')
+
+plt.grid(True, alpha=0.3)
+plt.xlabel('Дальность полёта, м', fontsize=12)
+plt.ylabel('Высота, м', fontsize=12)
+plt.title('Траектория движения материальной точки\n(метод Эйлера)', fontsize=14)
+plt.legend(fontsize=10)
+
+plt.text(0.02, 0.98, f'Начальная скорость: {V_0} м/с\nУгол броска: {theta_0}°\nМасса: {mass} кг', 
+         transform=plt.gca().transAxes, verticalalignment='top',
+         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+
+plt.axhline(y=0, color='k', linestyle='-', alpha=0.3) 
+plt.ylim(bottom=-5) 
+
+plt.tight_layout()
+plt.show()
